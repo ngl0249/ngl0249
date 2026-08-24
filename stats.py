@@ -27,6 +27,8 @@ def format_plural(unit):
 def simple_request(func_name, query, variables):
     request = requests.post('https://api.github.com/graphql', json={'query': query, 'variables':variables}, headers=HEADERS)
     if request.status_code == 200:
+        if 'errors' in request.json():
+            print('GraphQL errors i', func_name, ':', request.json()['errors'])
         return request
     raise Exception(func_name, ' has failed with a', request.status_code, request.text, QUERY_COUNT)
 
@@ -129,6 +131,8 @@ def recursive_loc(owner, repo_name, data, cache_comment, addition_total=0, delet
 
 def loc_counter_one_repo(owner, repo_name, data, cache_comment, history, addition_total, deletion_total, my_commits):
     for node in history['edges']:
+        if node is None or node.get('node') is None:
+            continue
         if node['node']['author']['user'] == OWNER_ID:
             my_commits += 1
             addition_total += node['node']['additions']
@@ -179,6 +183,7 @@ def loc_query(owner_affiliation, comment_size=0, force_cache=False, cursor=None,
 
 def cache_builder(edges, comment_size, force_cache, loc_add=0, loc_del=0):
     cached = True
+    edges = [edge for edge in edges if edge is not None and edge.get('node') is not None]
     filename = 'cache/'+hashlib.sha256(USER_NAME.encode('utf-8')).hexdigest()+'.txt'
     try:
         with open(filename, 'r') as f:
@@ -255,7 +260,10 @@ def force_close_file(data, cache_comment):
 
 def stars_counter(data):
     total_stars = 0
-    for node in data: total_stars += node['node']['stargazers']['totalCount']
+    for node in data:
+        if node is None or node.get('node') is None:
+            continue
+        total_stars += node['node']['stargazers']['totalCount']
     return total_stars
 
 
